@@ -1,0 +1,26 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Icon files that get generated during build
+*.icns
+
+# Platypus build artifacts (if any)
+*.app
+
+# Logs
+*.log
+
+# Editor / IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Temporary files
+*.tmp
+*.bak
+
+# User-specific Platypus settings (if created)
+PlatypusPreferences.plist
