@@ -6,123 +6,77 @@ title: Grok Launcher for Arc
 
 A native macOS `.app` launcher for [grok.com](https://grok.com) that opens inside your existing **Arc Browser** using Little Arc windows.
 
+## Current Behavior
+
+- Every click opens a **new Little Arc window** (this is the supported and intentional behavior)
+- Works even when Arc is completely closed
+- Uses your existing Arc data, profiles, and logins
+
 ## Why This Exists
 
-Arc does not support traditional PWA / `--app` mode well. This launcher gives you the closest possible experience while staying 100% inside Arc:
-
-- Dedicated icon in Dock and Applications
-- Appears in Cmd+Tab
-- Opens even when Arc is closed
-- Uses Little Arc (the best focused-window experience Arc currently offers)
-
-## Smart Focus Behavior
-
-The launcher tries to be "single app"-like:
-
-1. If a window or tab containing grok.com / grok.x.ai is already open → focus it
-2. Otherwise → create a new Little Arc window
+Arc does not support traditional Chromium `--app` / PWA mode well. This project gives you the closest possible native-app experience while staying 100% inside Arc.
 
 ## Files
 
 ```
 launchers/grok/
-├── grok-launcher.sh          # The Platypus script (smart focus version)
-├── README.md                 # This file
+├── grok-launcher.sh          # The script fed to Platypus
+├── README.md
 └── icon/
-    └── create-icon.sh        # Converts WebP/PNG → proper .icns
+    └── create-icon.sh        # Smart icon converter (WebP, JPG, HEIC → PNG → .icns)
 ```
 
-## Build Instructions
+## Building the Launcher
 
-### Prerequisites
+### 1. Prepare Icon
 
-- [Platypus](https://sveinbjorn.org/platypus) installed
-- A source icon image (WebP or PNG) of the Grok / xAI logo
+Put any image (`grok.webp`, `icon.png`, `logo.jpg`, etc.) in the parent folder.
 
-### Step 1: Prepare the Icon
-
-1. Save a high-quality Grok or xAI logo as `.webp` or `.png` in the `icon/` folder (or anywhere).
-2. Recommended names: `icon.webp`, `grok.webp`, `source.png`
-
-3. Run the converter:
+Then run:
 
 ```bash
 cd icon
 ./create-icon.sh
 ```
 
-It will auto-detect your source image and produce `Grok.icns`.
+The script will:
+- Auto-detect the best image
+- Convert it to PNG if needed (WebP, JPG, HEIC, etc.)
+- Generate a proper `Grok.icns`
 
-**Manual usage:**
-```bash
-./create-icon.sh /path/to/your-logo.png
-```
+### 2. Create the .app in Platypus
 
-### Step 2: Create the .app with Platypus
+| Setting                                   | Recommended Value             |
+|-------------------------------------------|-------------------------------|
+| Script Type                               | Shell                         |
+| Script Path                               | `grok-launcher.sh`            |
+| App Name                                  | `Grok`                        |
+| Interface                                 | **None** (important)          |
+| Interpreter                               | `/bin/bash`                   |
+| Remain running after script completes     | **Unchecked**                 |
 
-Open **Platypus** and configure it exactly like this:
+Drag the generated `Grok.icns` into Platypus.
 
-| Setting                                   | Value                              | Notes |
-|-------------------------------------------|------------------------------------|-------|
-| Script Type                               | Shell                              | — |
-| Script Path                               | Select `grok-launcher.sh`          | — |
-| App Name                                  | `Grok`                             | Becomes the .app filename |
-| Interface                                 | **None**                           | **Critical** for clean launcher |
-| Interpreter                               | `/bin/bash`                        | — |
-| Remain running after script completes     | **Unchecked**                      | We want the script to exit |
-| Bring to front                            | Checked                            | Good UX |
-| Accept dropped items                      | Unchecked                          | Not needed |
-| Run with root privileges                  | Unchecked                          | Never needed |
+Click **Create App**.
 
-**Icon:** Drag `Grok.icns` from the `icon/` folder into Platypus's icon well.
-
-Click **Create App** and save it somewhere as `Grok.app`.
-
-### Step 3: Install the Launcher
+### 3. Install
 
 ```bash
-# Copy to Applications
 cp -R Grok.app /Applications/
-
-# Remove macOS quarantine (first run only)
-xattr -d com.apple.quarantine /Applications/Grok.app
-
-# Optional: codesign for better Gatekeeper behavior
-codesign --force --deep --sign - /Applications/Grok.app
+xattr -d com.apple.quarantine /Applications/Grok.app   # if needed
 ```
 
-Drag `Grok.app` from `/Applications` into your Dock.
+Drag it to your Dock.
 
 ## Testing
 
-You can test the raw script without Platypus:
-
 ```bash
-./grok-launcher.sh
+./grok-launcher.sh     # test the raw script
 ```
 
-## First Run Permissions
+## Notes
 
-The first time the launcher runs, macOS may ask:
+- The first run may prompt for AppleScript permission ("Terminal wants to control Arc"). Allow it.
+- This is the current recommended pattern for Arc-based launchers in this project.
 
-> "Terminal" wants to control "Arc"
-
-or similar. Click **Allow**. This is required for AppleScript to tell Arc to open the URL.
-
-Subsequent runs should be silent.
-
-## Known Limitations
-
-- Little Arc windows are the best Arc currently offers for focused experiences.
-- Tab/window detection is best-effort (Arc's AppleScript dictionary is limited, especially for Little Arc).
-- If detection fails, it will safely fall back to creating a new window.
-
-## Customization
-
-Want a different URL or multiple instances?
-
-Edit the `URL=` line and the AppleScript domains array in `grok-launcher.sh`.
-
-## Related
-
-See the root [Mental Model](../../docs/mental-model.md) for why we chose this approach.
+See the main [Mental Model](../../docs/mental-model.md) for deeper context.
