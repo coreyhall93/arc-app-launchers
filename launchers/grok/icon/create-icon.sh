@@ -1,75 +1,95 @@
 #!/bin/bash
 #
-# Grok Icon Converter
-# Converts a source image (PNG, WebP, JPG) into a proper macOS .icns file
-# for use with Platypus or manual embedding into a .app bundle.
+# create-icon.sh
+# Converts various image formats (WebP, PNG, JPG, HEIC, etc.) into a macOS .icns file.
+#
+# Features:
+# - Auto-detects common image files in the parent directory
+# - Automatically converts non-PNG images to PNG first
+# - Uses the parent folder name as the app name (e.g. "grok" → Grok.icns)
+# - Much better error messages and progress output
 #
 # Usage:
-#   ./create-icon.sh                    # auto-detects icon.* in parent dir
-#   ./create-icon.sh /path/to/image.png
+#   ./create-icon.sh                  # auto-detects best image in parent folder
+#   ./create-icon.sh /path/to/image.webp
+#
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PARENT_DIR="$(dirname "$SCRIPT_DIR")"
 
-# Try to find source image
+# Determine app name from parent folder (capitalized)
+APP_NAME="$(basename "$PARENT_DIR" | sed -e 's/^./\U&/')"
+
+# Allow overriding via argument
+SOURCE=""
+
 if [ -n "$1" ]; then
     SOURCE="$1"
 else
-    # Auto-detect common names
-    for candidate in "icon.webp" "icon.png" "grok.webp" "grok.png" "source.webp" "source.png" "logo.webp" "logo.png"; do
-        if [ -f "$PARENT_DIR/$candidate" ]; then
-            SOURCE="$PARENT_DIR/$candidate"
-            echo "Found source image: $SOURCE"
-            break
-        fi
+    # Auto-detect best source image (prefer PNG > JPG > WebP > others)
+    for ext in png jpg jpeg heic heif webp tiff; do
+        for file in "$PARENT_DIR"/*."$ext" "$PARENT_DIR"/*."${ext^^}"; do
+            if [ -f "$file" ]; then
+                SOURCE="$file"
+                break 2
+            fi
+        done
     done
 fi
 
 if [ -z "$SOURCE" ] || [ ! -f "$SOURCE" ]; then
-    echo "Error: No source image found."
-    echo "Place a .png or .webp file named icon.webp / grok.webp / source.png etc. next to this script,"
-    echo "or pass the path as argument: ./create-icon.sh /path/to/your-icon.webp"
+    echo "❌ No suitable image file found."
+    echo ""
+    echo "Place one of these in the parent folder:"
+    echo "   icon.png, icon.webp, icon.jpg, grok.png, logo.webp, etc."
+    echo ""
+    echo "Or run with a specific file:"
+    echo "   ./create-icon.sh /path/to/your/image.webp"
     exit 1
 fi
 
-# Create iconset directory
-ICONSET="$SCRIPT_DIR/Grok.iconset"
-rm -rf "$ICONSET"
-mkdir -p "$ICONSET"
+echo "✅ Found source image: $SOURCE"
+echo "   App name will be: $APP_NAME"
 
-echo "Converting $SOURCE → Grok.icns ..."
+# If the source is not PNG, convert it first
+FINAL_SOURCE="$SOURCE"
 
-# Function to resize using sips
-resize() {
-    local size=$1
-    local name=$2
-    sips -z "$size" "$size" "$SOURCE" --out "$ICONSET/$name" >/dev/null 2>&1
-}
+if [[ ! "$SOURCE" =~ \.png$ ]]; then
+    echo "🔄 Converting to PNG first (required for high-quality .icns)..."
+    PNG_TEMP="$SCRIPT_DIR/${APP_NAME}-source.png"
+    sips -s format png "$SOURCE" --out "$PNG_TEMP" > /dev/null
+    FINAL_SOURCE="$PNG_TEMP"
+    echo "   Converted → $FINAL_SOURCE"
+fi
 
-# Generate all required sizes for a full .icns
-# macOS .icns requires these (and @2x retina versions)
+# Prepare iconset
+ICONSET_DIR="$SCRIPT_DIR/${APP_NAME}.iconset"
+rm -rf "$ICONSET_DIR"
+mkdir -p "$ICONSET_DIR"
 
- echo "Generating icon sizes..."
+echo "📐 Generating all required icon sizes..."
 
-# Standard sizes + Retina (@2x)
-resize 16   "icon_16x16.png"
-resize 32   "icon_16x16@2x.png"
-resize 32   "icon_32x32.png"
-resize 64   "icon_32x32@2x.png"
-resize 128  "icon_128x128.png"
-resize 256  "icon_128x128@2x.png"
-resize 256  "icon_256x256.png"
-resize 512  "icon_256x256@2x.png"
-resize 512  "icon_512x512.png"
-resize 1024 "icon_512x512@2x.png"
+# Generate all standard sizes + Retina versions
+sips -z 16 16     "$FINAL_SOURCE" --out "$ICONSET_DIR/icon_16x16.png"     > /dev/null
+sips -z 32 32     "$FINAL_SOURCE" --out "$ICONSET_DIR/icon_16x16@2x.png"  > /dev/null
+sips -z 32 32     "$FINAL_SOURCE" --out "$ICONSET_DIR/icon_32x32.png"     > /dev/null
+sips -z 64 64     "$FINAL_SOURCE" --out "$ICONSET_DIR/icon_32x32@2x.png"  > /dev/null
+sips -z 128 128   "$FINAL_SOURCE" --out "$ICONSET_DIR/icon_128x128.png"   > /dev/null
+sips -z 256 256   "$FINAL_SOURCE" --out "$ICONSET_DIR/icon_128x128@2x.png"> /dev/null
+sips -z 256 256   "$FINAL_SOURCE" --out "$ICONSET_DIR/icon_256x256.png"   > /dev/null
+sips -z 512 512   "$FINAL_SOURCE" --out "$ICONSET_DIR/icon_256x256@2x.png"> /dev/null
+sips -z 512 512   "$FINAL_SOURCE" --out "$ICONSET_DIR/icon_512x512.png"   > /dev/null
+sips -z 1024 1024 "$FINAL_SOURCE" --out "$ICONSET_DIR/icon_512x512@2x.png"> /dev/null
 
-# Create the .icns file
-ICON_OUTPUT="$SCRIPT_DIR/Grok.icns"
-iconutil -c icns "$ICONSET" -o "$ICON_OUTPUT"
+echo "🛠️  Building .icns file..."
 
- echo "✅ Created: $ICON_OUTPUT"
- echo ""
- echo "You can now drag Grok.icns into Platypus, or copy it manually into:"
- echo "  Grok.app/Contents/Resources/Grok.icns"
+ICON_OUTPUT="$SCRIPT_DIR/${APP_NAME}.icns"
+iconutil -c icns "$ICONSET_DIR" -o "$ICON_OUTPUT"
+
+echo ""
+echo "✅ Success! Created: $ICON_OUTPUT"
+echo ""
+echo "You can now drag this into Platypus, or copy it to:"
+echo "   YourApp.app/Contents/Resources/${APP_NAME}.icns"
